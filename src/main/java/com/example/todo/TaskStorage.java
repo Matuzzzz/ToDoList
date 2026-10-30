@@ -1,9 +1,10 @@
 package com.example.todo;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Map;
 
 public interface TaskStorage {
-    List<Task> load() throws IOException;
-    void save(List<Task> tasks) throws IOException;
+    Map<Integer, Task> load() throws IOException;
+
+    void save(Map<Integer, Task> tasks) throws IOException;
 }

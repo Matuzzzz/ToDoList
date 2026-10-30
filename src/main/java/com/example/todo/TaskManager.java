@@ -1,46 +1,66 @@
 package com.example.todo;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class TaskManager {
-    private final List<Task> tasks;
+    private final Map<Integer, Task> tasks;
     private final TaskStorage storage;
     private int nextId;
 
     public TaskManager(TaskStorage storage) throws IOException {
         this.storage = storage;
-        this.tasks = new ArrayList<>(storage.load());
-        this.nextId = tasks.stream()
-                .mapToInt(Task::getId)
+        this.tasks = new HashMap<>(storage.load());
+        this.nextId = tasks.keySet().stream()
+                .mapToInt(Integer::intValue)
                 .max()
                 .orElse(0) + 1;
     }
 
     public void addTask(String title) throws IOException {
         Task task = new Task(nextId, title, false);
-        tasks.add(task);
-        storage.save(tasks);
-        nextId++;
+        tasks.put(task.getId(), task);
+
+        try {
+            storage.save(tasks);
+            nextId++;
+        } catch (IOException exception) {
+            tasks.remove(task.getId());
+            throw exception;
+        }
     }
 
     public void completeTask(int id) throws IOException {
-        Task task = tasks.stream()
-                .filter(item -> item.getId() == id)
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Task not found."));
-        task.markCompleted();
-        storage.save(tasks);
+        Task task = tasks.get(id);
+
+        if (task == null) {
+            throw new IllegalArgumentException("Task not found.");
+        }
+
+        boolean previousStatus = task.isCompleted();
+        task.setCompleted(true);
+
+        try {
+            storage.save(tasks);
+        } catch (IOException exception) {
+            task.setCompleted(previousStatus);
+            throw exception;
+        }
     }
 
     public List<Task> getAllTasks() {
-        return List.copyOf(tasks);
+        return tasks.values().stream()
+                .sorted(Comparator.comparingInt(Task::getId))
+                .toList();
     }
 
     public List<Task> getOpenTasks() {
-        return tasks.stream()
+        return tasks.values().stream()
                 .filter(task -> !task.isCompleted())
+                .sorted(Comparator.comparingInt(Task::getId))
                 .toList();
     }
 }

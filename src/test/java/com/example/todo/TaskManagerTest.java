@@ -7,7 +7,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaskManagerTest {
     @TempDir
@@ -22,6 +24,7 @@ class TaskManagerTest {
 
         assertEquals(1, manager.getAllTasks().size());
         assertTrue(file.toFile().exists());
+        assertEquals("Study Java", new CsvTaskStorage(file).load().get(1).getTitle());
     }
 
     @Test
@@ -42,5 +45,36 @@ class TaskManagerTest {
         TaskManager manager = new TaskManager(new CsvTaskStorage(tempDir.resolve("tasks.csv")));
 
         assertThrows(IllegalArgumentException.class, () -> manager.addTask("   "));
+    }
+
+    @Test
+    void returnsTasksInIdOrder() throws IOException {
+        TaskManager manager = new TaskManager(new CsvTaskStorage(tempDir.resolve("tasks.csv")));
+        manager.addTask("First task");
+        manager.addTask("Second task");
+
+        List<Integer> taskIds = manager.getAllTasks().stream()
+                .map(Task::getId)
+                .toList();
+
+        assertEquals(List.of(1, 2), taskIds);
+    }
+
+    @Test
+    void taskHasReadableStringRepresentation() {
+        Task task = new Task(1, "Study Java", false);
+
+        assertEquals("1 | Study Java | OPEN", task.toString());
+
+        task.setCompleted(true);
+
+        assertEquals("1 | Study Java | DONE", task.toString());
+    }
+
+    @Test
+    void rejectsUnknownTaskId() throws IOException {
+        TaskManager manager = new TaskManager(new CsvTaskStorage(tempDir.resolve("tasks.csv")));
+
+        assertThrows(IllegalArgumentException.class, () -> manager.completeTask(99));
     }
 }

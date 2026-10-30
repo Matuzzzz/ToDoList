@@ -15,6 +15,7 @@ public class Task {
         if (title.contains(";") || title.contains("\n") || title.contains("\r")) {
             throw new IllegalArgumentException("Title cannot contain semicolons or line breaks.");
         }
+
         this.id = id;
         this.title = title.trim();
         this.completed = completed;
@@ -32,7 +33,13 @@ public class Task {
         return completed;
     }
 
-    public void markCompleted() {
-        completed = true;
+    public void setCompleted(boolean completed) {
+        this.completed = completed;
+    }
+
+    @Override
+    public String toString() {
+        String status = isCompleted() ? "DONE" : "OPEN";
+        return getId() + " | " + getTitle() + " | " + status;
     }
 }
