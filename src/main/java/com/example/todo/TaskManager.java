@@ -34,12 +34,7 @@ public class TaskManager {
     }
 
     public void completeTask(int id) throws IOException {
-        Task task = tasks.get(id);
-
-        if (task == null) {
-            throw new IllegalArgumentException("Task not found.");
-        }
-
+        Task task = findTask(id);
         boolean previousStatus = task.isCompleted();
         task.setCompleted(true);
 
@@ -47,6 +42,20 @@ public class TaskManager {
             storage.save(tasks);
         } catch (IOException exception) {
             task.setCompleted(previousStatus);
+            throw exception;
+        }
+    }
+
+    public void deleteTask(int id) throws IOException {
+        Task removedTask = tasks.remove(id);
+        if (removedTask == null) {
+            throw new IllegalArgumentException("Task not found.");
+        }
+
+        try {
+            storage.save(tasks);
+        } catch (IOException exception) {
+            tasks.put(id, removedTask);
             throw exception;
         }
     }
@@ -62,5 +71,13 @@ public class TaskManager {
                 .filter(task -> !task.isCompleted())
                 .sorted(Comparator.comparingInt(Task::getId))
                 .toList();
+    }
+
+    private Task findTask(int id) {
+        Task task = tasks.get(id);
+        if (task == null) {
+            throw new IllegalArgumentException("Task not found.");
+        }
+        return task;
     }
 }

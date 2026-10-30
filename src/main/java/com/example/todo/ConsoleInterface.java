@@ -2,16 +2,19 @@ package com.example.todo;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
 public class ConsoleInterface {
-    private final Map<String, ConsoleCommand> commands = new HashMap<>();
+    private final CommandRegistry commandRegistry = new CommandRegistry();
     private TaskManager taskManager;
     private Scanner scanner;
     private boolean running;
+
+    public ConsoleInterface() {
+        registerDefaultCommands();
+    }
 
     public void start() {
         try (Scanner input = new Scanner(System.in)) {
@@ -24,36 +27,42 @@ public class ConsoleInterface {
                 return;
             }
 
-            registerCommands();
             running = true;
-
-            while (running) {
+            while (running && scanner.hasNextLine()) {
                 printMenu();
-                executeCommand(scanner.nextLine().trim());
+                executeCommand(scanner.nextLine());
             }
         } finally {
             scanner = null;
         }
     }
 
-    private void registerCommands() {
-        commands.put("1", this::addTask);
-        commands.put("2", () -> printTasks(taskManager.getAllTasks()));
-        commands.put("3", () -> printTasks(taskManager.getOpenTasks()));
-        commands.put("4", this::completeTask);
-        commands.put("0", this::exit);
+    //Register Command a úpraava Key
+    public void registerCommand(String key, String description, CommandRegistry.CommandAction action) {
+        commandRegistry.register(key, description, action);
     }
 
-    private void executeCommand(String choice) {
-        ConsoleCommand command = commands.get(choice);
+    /** Changes a command's shortcut without changing its action or description. */
+    public void changeCommandShortcut(String currentKey, String newKey) {
+        commandRegistry.changeShortcut(currentKey, newKey);
+    }
 
-        if (command == null) {
-            printError("Invalid option. Please choose 0, 1, 2, 3, or 4.");
-            return;
-        }
+    private void registerDefaultCommands() {
+        // Change a shortcut here once; the menu and command lookup update automatically.
+        registerCommand("1", "Add task", this::addTask);
+        registerCommand("2", "Show all tasks", () -> printTasks(taskManager.getAllTasks()));
+        registerCommand("3", "Show open tasks", () -> printTasks(taskManager.getOpenTasks()));
+        registerCommand("4", "Mark task as done", this::completeTask);
+        registerCommand("5", "Delete task", this::deleteTask);
+        registerCommand("6", "Change a command shortcut", this::changeCommandShortcut);
+        registerCommand("0", "Exit", this::exit);
+    }
 
+    private void executeCommand(String key) {
         try {
-            command.execute();
+            if (!commandRegistry.execute(key)) {
+                printError("Unknown command. Choose one of the keys shown in the menu.");
+            }
         } catch (IllegalArgumentException exception) {
             printError("Input error: " + exception.getMessage());
         } catch (IOException exception) {
@@ -68,18 +77,36 @@ public class ConsoleInterface {
     }
 
     private void completeTask() throws IOException {
+        int id = readTaskId();
+        taskManager.completeTask(id);
+        printMessage("Task marked as done.");
+    }
+
+    private void deleteTask() throws IOException {
+        int id = readTaskId();
+        taskManager.deleteTask(id);
+        printMessage("Task deleted.");
+    }
+
+    private int readTaskId() {
         printPrompt("Task ID: ");
         String input = scanner.nextLine().trim();
-        int id;
 
         try {
-            id = Integer.parseInt(input);
+            return Integer.parseInt(input);
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException("Task ID must be a whole number.");
         }
+    }
 
-        taskManager.completeTask(id);
-        printMessage("Task marked as done.");
+    private void changeCommandShortcut() {
+        printPrompt("Current command key: ");
+        String currentKey = scanner.nextLine();
+        printPrompt("New command key: ");
+        String newKey = scanner.nextLine();
+
+        changeCommandShortcut(currentKey, newKey);
+        printMessage("Command shortcut updated.");
     }
 
     private void printTasks(List<Task> tasks) {
@@ -98,15 +125,13 @@ public class ConsoleInterface {
 
     private void printMenu() {
         printMessage("\n=== TO-DO LIST ===");
-        printMessage("1 - Add task");
-        printMessage("2 - Show all tasks");
-        printMessage("3 - Show open tasks");
-        printMessage("4 - Mark task as done");
-        printMessage("0 - Exit");
+        commandRegistry.getCommands().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> printMessage(entry.getKey() + " - " + entry.getValue().description()));
         printPrompt("Choose: ");
     }
 
-    private void printMessage(String message) {
+    public void printMessage(String message) {
         System.out.println(message);
     }
 
@@ -116,10 +141,5 @@ public class ConsoleInterface {
 
     private void printError(String message) {
         System.err.println("Error: " + message);
-    }
-
-    @FunctionalInterface
-    private interface ConsoleCommand {
-        void execute() throws IOException;
     }
 }
